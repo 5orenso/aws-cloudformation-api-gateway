@@ -107,6 +107,3 @@ echo "Waiting for stack \"${STACK_NAME}\" to finish action \"${STACK_ACTION}\""
 aws cloudformation --region ${AWS_REGION} ${AWS_PROFILE} wait stack-update-complete --stack-name ${STACK_NAME}
 echo "Stack \"${STACK_NAME}\" \"${STACK_ACTION}\" is done."
 echo ""
-echo "Now it's time to test it:"
-echo "     $ aws s3 cp --region ${AWS_REGION} ${AWS_PROFILE} ${DIR}/../dist/${STACK_NAME}.zip s3://${LAMBDA_S3_AUTODEPLOY_BUCKET}/${STACK_NAME}.zip"
-echo ""
