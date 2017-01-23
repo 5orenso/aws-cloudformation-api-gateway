@@ -1,0 +1,247 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Creates an API gateway with a Lambda function and as a proxy.",
+
+    "Parameters": {
+        "APIName": {
+            "Description": "Name of the API to create",
+            "Type": "String",
+            "AllowedPattern": "[A-Za-z0-9\\-]*",
+            "MinLength": "4",
+            "MaxLength": "2048",
+            "ConstraintDescription": "must contain only alphanumeric characters (at least four)"
+        },
+        "APIDescription": {
+            "Description": "Description of the API to create",
+            "Type": "String",
+            "Default": "No description provided. Provide 'APIDescription' param to override this."
+        },
+        "APIPath": {
+            "Description": "URL path for the API",
+            "Type": "String",
+            "Default": "api",
+            "AllowedPattern": "[A-Za-z0-9\\-]*",
+            "MinLength": "1",
+            "MaxLength": "64",
+            "ConstraintDescription": "must contain only alphanumeric characters (1-64 chars)"
+        },
+        "APIStageName": {
+            "Description": "Stage name to deploy the API to",
+            "Type": "String",
+            "Default": "dev",
+            "AllowedPattern": "[A-Za-z0-9]*",
+            "MinLength": "1",
+            "MaxLength": "64",
+            "ConstraintDescription": "must contain only alphanumeric characters (1-64 chars)"
+        },
+        "LambdaCodeBucket": {
+            "Description": "Name of the S3 bucket that's storing the Lamba function's zip file",
+            "Type": "String"
+        },
+        "LambdaCodePath": {
+            "Description": "Path to the zip file of code for the Lambda function",
+            "Type": "String"
+        }
+    },
+
+    "Resources": {
+        "LambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "S3Bucket": { "Ref": "LambdaCodeBucket" },
+                    "S3Key": { "Ref": "LambdaCodePath" }
+                },
+                "FunctionName": { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" }, { "Ref": "APIName" } ] ] },
+                "Handler": "index.handler",
+                "MemorySize": "128",
+                "Role": { "Fn::GetAtt": [ "LambdaExecutionRole", "Arn" ] },
+                "Runtime": "nodejs4.3",
+                "Timeout": "10"
+            }
+        },
+        "LambdaInvokePermission": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "FunctionName": { "Fn::GetAtt": [ "LambdaFunction", "Arn" ] },
+                "Action": "lambda:InvokeFunction",
+                "Principal": "apigateway.amazonaws.com"
+            }
+        },
+
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": { "Service": [ "lambda.amazonaws.com" ] },
+                            "Action": [ "sts:AssumeRole" ]
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" }, "UseDBPolicy" ] ] },
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": ["lambda:*"],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+
+        "APIMain": {
+            "Type": "AWS::ApiGateway::RestApi",
+            "Properties": {
+                "Name": { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" }, { "Ref": "APIName" }]]},
+                "Description": { "Ref": "APIDescription" }
+            }
+        },
+
+        "APIResource": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+                "RestApiId": { "Ref": "APIMain" },
+                "ParentId": { "Fn::GetAtt": [ "APIMain", "RootResourceId" ]},
+                "PathPart": { "Ref": "APIPath" }
+            }
+        },
+        "APIMethodANY": {
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "RestApiId": { "Ref": "APIMain" },
+                "ResourceId": { "Ref": "APIResource" },
+                "HttpMethod": "ANY",
+                "AuthorizationType": "NONE",
+                "Integration": {
+                    "Type": "AWS_PROXY",
+                    "Uri": {
+                        "Fn::Join": [":", [
+                            "arn:aws:apigateway",
+                            { "Ref": "AWS::Region" },
+                            { "Fn::Join": [ "/", [
+                                "lambda:path/2015-03-31/functions",
+                                { "Fn::GetAtt": [ "LambdaFunction", "Arn" ] }, "invocations"
+                            ]]}
+                        ]]
+                    },
+                    "IntegrationHttpMethod": "POST",
+                    "IntegrationResponses": [{
+                        "ResponseTemplates": {},
+                        "ResponseParameters": {},
+                        "StatusCode": 200
+                    }],
+                    "PassthroughBehavior": "WHEN_NO_MATCH",
+                    "RequestTemplates": {}
+                },
+                "RequestParameters": {
+                    "method.request.querystring.limit": false,
+                    "method.request.querystring.next": false
+                },
+                "MethodResponses": [{
+                    "ResponseModels": {},
+                    "ResponseParameters": {
+                        "method.response.header.Access-Control-Allow-Headers": true,
+                    },
+                    "StatusCode": 200
+                }]
+            }
+        },
+
+        "APIResourceProxy": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+                "RestApiId": { "Ref": "APIMain" },
+                "ParentId": { "Ref": "APIResource" },
+                "PathPart": "{proxy+}"
+            }
+        },
+        "APIMethodPRoxyANY": {
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "RestApiId": { "Ref": "APIMain" },
+                "ResourceId": { "Ref": "APIResourceProxy" },
+                "HttpMethod": "ANY",
+                "AuthorizationType": "NONE",
+                "Integration": {
+                    "Type": "HTTP_PROXY",
+                    "Uri": "https://httpbin.org/{proxy}",
+                    "IntegrationHttpMethod": "ANY",
+                    "PassthroughBehavior": "WHEN_NO_MATCH",
+                    "RequestParameters": {
+                        "integration.request.path.proxy" : "method.request.path.proxy"
+                    }
+                },
+                "RequestParameters": {
+                    "method.request.path.proxy": false
+                },
+             }
+        },
+
+
+        "APIDeployDev": {
+            "Type": "AWS::ApiGateway::Deployment",
+            "DependsOn": [ "APIMethodANY", "APIMethodPRoxyANY" ],
+            "Properties": {
+                "Description": "Date: 2017-01-05 13:22",
+                "RestApiId": { "Ref": "APIMain" },
+                "StageName": { "Ref": "APIStageName" },
+                "StageDescription": {
+                    "MetricsEnabled": "true",
+                    "LoggingLevel": "INFO"
+                }
+            }
+        },
+        "APIDeployProd": {
+            "Type": "AWS::ApiGateway::Deployment",
+            "DependsOn": [ "APIMethodANY", "APIMethodPRoxyANY" ],
+            "Properties": {
+                "Description": "Date: 2017-01-05 13:22",
+                "RestApiId": { "Ref": "APIMain" },
+                "StageName": "prod",
+                "StageDescription": {
+                    "MetricsEnabled": "true",
+                    "LoggingLevel": "INFO"
+                }
+            }
+        }
+    },
+
+    "Outputs": {
+        "LambdaName": {
+            "Value": { "Ref": "LambdaFunction" },
+            "Description": "The Lambda function",
+            "Export" : { "Name" : "ApiGwLambdaName" }
+        },
+        "APIMain": {
+            "Value": { "Ref": "APIMain" },
+            "Description": "The main API gateway",
+            "Export" : { "Name" : "ApiGwAPIMain" }
+        },
+        "APIMainParentId": {
+            "Value": { "Fn::GetAtt": [ "APIMain", "RootResourceId" ]},
+            "Description": "Parent ID to the API gateway",
+            "Export" : { "Name" : "ApiGwAPIMainParentId" }
+        },
+        "APIDeployment": {
+            "Value": { "Ref": "APIDeployDev" },
+            "Description": "The deployment of the API",
+            "Export" : { "Name" : "ApiGwAPIDeployment" }
+        }
+    }
+}
