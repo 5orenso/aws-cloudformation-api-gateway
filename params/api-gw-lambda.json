@@ -1,0 +1,18 @@
+[
+   {
+      "ParameterKey": "APIName",
+      "ParameterValue": "foo"
+   },
+   {
+      "ParameterKey": "APIPath",
+      "ParameterValue": "foo"
+   },
+   {
+      "ParameterKey": "LambdaCodeBucket",
+      "ParameterValue": "my-lambda-deploy-test-bucket"
+   },
+   {
+      "ParameterKey": "LambdaCodePath",
+      "ParameterValue": "aws-lambda-boilerplate.zip"
+   }
+]

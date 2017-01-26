@@ -1,0 +1,64 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Creates a new resource for an existing API gateway",
+
+    "Parameters": {
+        "APIName": {
+            "Description": "Name of the API resource to create",
+            "Type": "String",
+            "AllowedPattern": "[A-Za-z0-9\\-]*",
+            "MinLength": "4",
+            "MaxLength": "2048",
+            "ConstraintDescription": "must contain only alphanumeric characters (at least four)"
+        },
+        "APIPath": {
+            "Description": "URL path for the new API resource",
+            "Type": "String",
+            "Default": "api",
+            "AllowedPattern": "[A-Za-z0-9\\-]*",
+            "MinLength": "1",
+            "MaxLength": "64",
+            "ConstraintDescription": "must contain only alphanumeric characters (1-64 chars)"
+        }
+    },
+
+    "Resources": {
+        "APIResource": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+                "RestApiId": { "Fn::ImportValue" : "ApiGwAPIMain" },
+                "ParentId": { "Fn::ImportValue" : "ApiGwAPIMainParentId" },
+                "PathPart": { "Ref": "APIPath" }
+            }
+        },
+        "APIResourceProxy": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+                "RestApiId": { "Fn::ImportValue" : "ApiGwAPIMain" },
+                "ParentId": { "Ref": "APIResource" },
+                "PathPart": "{proxy+}"
+            }
+        },
+        "APIMethodHelloWorldPRoxyANY": {
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "RestApiId": { "Fn::ImportValue" : "ApiGwAPIMain" },
+                "ResourceId": { "Ref": "APIResourceProxy" },
+                "HttpMethod": "ANY",
+                "AuthorizationType": "NONE",
+                "Integration": {
+                    "Type": "HTTP_PROXY",
+                    "Uri": "https://httpbin.org/{proxy}",
+                    "IntegrationHttpMethod": "ANY",
+                    "PassthroughBehavior": "WHEN_NO_MATCH",
+                    "RequestParameters": {
+                        "integration.request.path.proxy" : "method.request.path.proxy"
+                    }
+                },
+                "RequestParameters": {
+                    "method.request.path.proxy": false
+                },
+             }
+        }
+    }
+}

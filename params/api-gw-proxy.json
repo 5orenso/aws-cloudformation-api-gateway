@@ -1,0 +1,10 @@
+[
+    {
+       "ParameterKey": "APIName",
+       "ParameterValue": "foobar"
+    },
+    {
+       "ParameterKey": "APIPath",
+       "ParameterValue": "foobar"
+    }
+]
