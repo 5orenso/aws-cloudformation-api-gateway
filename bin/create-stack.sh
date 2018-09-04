@@ -95,13 +95,19 @@ if [ -z "${API_NAME}" ] || [ -z "${API_PATH}" ] || [ -z "${LAMBDA_CODE_BUCKET}" 
 fi
 
 echo "Running \"${STACK_ACTION}\" on stack \"${STACK_NAME}\""
-aws cloudformation ${DRYRUN} ${STACK_ACTION} --region ${AWS_REGION} ${AWS_PROFILE} --stack-name ${STACK_NAME} \
-    --template-body file://${DIR}/../templates/api-gw-${TEMPLATE}.json --capabilities CAPABILITY_IAM \
-    --parameters \
-        ParameterKey=APIName,ParameterValue=${API_NAME} \
-        ParameterKey=APIPath,ParameterValue=${API_PATH} \
-        ParameterKey=LambdaCodeBucket,ParameterValue=${LAMBDA_CODE_BUCKET} \
-        ParameterKey=LambdaCodePath,ParameterValue=${LAMBDA_CODE_KEY}
+if [ -z "${TEMPLATE}" ]; then
+    aws cloudformation ${DRYRUN} ${STACK_ACTION} --region ${AWS_REGION} ${AWS_PROFILE} --stack-name ${STACK_NAME} \
+        --template-body file://${DIR}/../templates/api-gw-${TEMPLATE}.json --capabilities CAPABILITY_IAM \
+        --parameters \
+            ParameterKey=APIName,ParameterValue=${API_NAME} \
+            ParameterKey=APIPath,ParameterValue=${API_PATH} \
+            ParameterKey=LambdaCodeBucket,ParameterValue=${LAMBDA_CODE_BUCKET} \
+            ParameterKey=LambdaCodePath,ParameterValue=${LAMBDA_CODE_KEY}
+else
+    aws cloudformation ${DRYRUN} ${STACK_ACTION} --region ${AWS_REGION} ${AWS_PROFILE} --stack-name ${STACK_NAME} \
+        --template-body file://${DIR}/../templates/api-gw-${TEMPLATE}.json --capabilities CAPABILITY_IAM \
+        --parameters file://${DIR}/../params/api-gw-${TEMPLATE}.json
+fi
 
 echo "Waiting for stack \"${STACK_NAME}\" to finish action \"${STACK_ACTION}\""
 aws cloudformation --region ${AWS_REGION} ${AWS_PROFILE} wait stack-update-complete --stack-name ${STACK_NAME}

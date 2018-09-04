@@ -1,0 +1,18 @@
+[
+   {
+      "ParameterKey": "APIName",
+      "ParameterValue": "hello-world"
+   },
+   {
+      "ParameterKey": "APIPath",
+      "ParameterValue": "hello-world"
+   },
+   {
+      "ParameterKey": "LambdaCodeBucket",
+      "ParameterValue": "aws-lambda-autodeploy-lambda"
+   },
+   {
+      "ParameterKey": "LambdaCodePath",
+      "ParameterValue": "helloWorld.zip"
+   }
+]
